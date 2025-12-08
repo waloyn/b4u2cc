@@ -10,6 +10,7 @@ import { SSEWriter } from "./sse.ts";
 import { ClaudeRequest } from "./types.ts";
 import { RateLimiter } from "./rate_limiter.ts";
 import { randomTriggerSignal } from "./signals.ts";
+import { countTokens } from "./token_counter.ts";
 
 function extractDeltaText(delta: Record<string, unknown> | undefined): string {
   if (!delta) return "";
@@ -73,6 +74,13 @@ async function handleMessages(req: Request, requestId: string) {
   }
 
   try {
+    // 计算 input tokens
+    const tokenCount = await countTokens(body, config, requestId);
+    await logRequest(requestId, "info", "Token count calculated", {
+      input_tokens: tokenCount.input_tokens,
+      output_tokens: tokenCount.output_tokens,
+    });
+
     // 如果有工具，先生成统一的触发信号
     const triggerSignal = (body.tools ?? []).length > 0 ? randomTriggerSignal() : undefined;
     const openaiBase = mapClaudeToOpenAI(body, config, triggerSignal);
@@ -102,7 +110,7 @@ async function handleMessages(req: Request, requestId: string) {
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const writer = new SSEWriter(controller, requestId);
-        const claudeStream = new ClaudeStream(writer, config, requestId);
+        const claudeStream = new ClaudeStream(writer, config, requestId, tokenCount.input_tokens);
         // 发送 message_start 事件（完全按照官方格式）
         await claudeStream.init();
         const parser = new ToolifyParser(injected.triggerSignal);
@@ -197,6 +205,42 @@ async function handleMessages(req: Request, requestId: string) {
   }
 }
 
+async function handleTokenCount(req: Request, requestId: string) {
+  if (!validateClientKey(req, config)) {
+    return unauthorized();
+  }
+
+  let body: ClaudeRequest;
+  let rawBody = "";
+  try {
+    rawBody = await req.text();
+    body = JSON.parse(rawBody);
+    await logRequest(requestId, "debug", "Received Claude token count request body", {
+      rawPreview: body,
+    });
+  } catch {
+    return jsonResponse({ error: "invalid JSON body" }, 400);
+  }
+
+  try {
+    // 计算 token 数量
+    const tokenCount = await countTokens(body, config, requestId);
+    await logRequest(requestId, "info", "Token count calculated", {
+      input_tokens: tokenCount.input_tokens,
+      output_tokens: tokenCount.output_tokens,
+    });
+
+    return jsonResponse({
+      input_tokens: tokenCount.input_tokens,
+      output_tokens: tokenCount.output_tokens,
+    });
+  } catch (error) {
+    await logRequest(requestId, "error", "Failed to count tokens", { error: String(error) });
+    await closeRequestLog(requestId);
+    return jsonResponse({ error: "token_count_error", details: String(error) }, 500);
+  }
+}
+
 serve((req) => {
   const url = new URL(req.url);
 
@@ -218,6 +262,12 @@ serve((req) => {
     const requestId = crypto.randomUUID();
     log("info", "Handling Claude message", { requestId });
     return handleMessages(req, requestId);
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/messages/count_tokens") {
+    const requestId = crypto.randomUUID();
+    log("info", "Handling Claude token count request", { requestId });
+    return handleTokenCount(req, requestId);
   }
 
   return new Response("Not Found", { status: 404 });

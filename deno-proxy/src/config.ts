@@ -8,6 +8,7 @@ export interface ProxyConfig {
   requestTimeoutMs: number;
   aggregationIntervalMs: number;
   maxRequestsPerMinute: number;
+  tokenMultiplier: number;
 }
 
 export function loadConfig(): ProxyConfig {
@@ -24,6 +25,7 @@ export function loadConfig(): ProxyConfig {
   const requestTimeoutMs = Number(Deno.env.get("TIMEOUT_MS") ?? "120000");
   const aggregationIntervalMs = Number(Deno.env.get("AGGREGATION_INTERVAL_MS") ?? "35");
   const maxRequestsPerMinute = Number(Deno.env.get("MAX_REQUESTS_PER_MINUTE") ?? "10");
+  const tokenMultiplier = Number(Deno.env.get("TOKEN_MULTIPLIER") ?? "1.0");
 
   return {
     port,
@@ -35,5 +37,6 @@ export function loadConfig(): ProxyConfig {
     requestTimeoutMs,
     aggregationIntervalMs,
     maxRequestsPerMinute,
+    tokenMultiplier,
   };
 }

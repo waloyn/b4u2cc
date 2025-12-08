@@ -1,7 +1,8 @@
 {
   "tasks": {
     "dev": "deno run --allow-net --allow-env src/main.ts",
-    "test": "deno test --allow-env src"
+    "test": "deno test --allow-env src",
+    "test-token": "deno run --allow-env --allow-net src/test_token_counter.ts"
   },
   "fmt": {
     "lineWidth": 100,
@@ -12,5 +13,8 @@
     "rules": {
       "exclude": ["no-explicit-any"]
     }
+  },
+  "imports": {
+    "js-tiktoken": "npm:js-tiktoken@^1.0.7"
   }
 }

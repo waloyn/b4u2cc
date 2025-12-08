@@ -1,5 +1,19 @@
 {
   "version": "5",
+  "specifiers": {
+    "npm:js-tiktoken@^1.0.7": "1.0.21"
+  },
+  "npm": {
+    "base64-js@1.5.1": {
+      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
+    },
+    "js-tiktoken@1.0.21": {
+      "integrity": "sha512-biOj/6M5qdgx5TKjDnFT1ymSpM5tbd3ylwDtrQvFQSu0Z7bBYko2dF+W/aUkXUPuk6IVpRxk/3Q2sHOzGlS36g==",
+      "dependencies": [
+        "base64-js"
+      ]
+    }
+  },
   "redirects": {
     "https://deno.land/std/http/server.ts": "https://deno.land/std@0.224.0/http/server.ts"
   },
@@ -70,5 +84,10 @@
     "https://deno.land/std@0.224.0/path/windows/normalize.ts": "78126170ab917f0ca355a9af9e65ad6bfa5be14d574c5fb09bb1920f52577780",
     "https://deno.land/std@0.224.0/path/windows/normalize_glob.ts": "9c87a829b6c0f445d03b3ecadc14492e2864c3ebb966f4cea41e98326e4435c6",
     "https://deno.land/std@0.224.0/path/windows/resolve.ts": "8dae1dadfed9d46ff46cc337c9525c0c7d959fb400a6308f34595c45bdca1972"
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:js-tiktoken@^1.0.7"
+    ]
   }
 }

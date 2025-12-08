@@ -25,8 +25,9 @@ interface StreamContext {
 
 export class ClaudeStream {
   private context: StreamContext;
+  private tokenMultiplier: number;
 
-  constructor(private writer: SSEWriter, config: ProxyConfig, requestId: string) {
+  constructor(private writer: SSEWriter, config: ProxyConfig, requestId: string, inputTokens: number = 0) {
     this.context = {
       requestId,
       writer,
@@ -36,10 +37,14 @@ export class ClaudeStream {
       finished: false,
       totalOutputTokens: 0,
     };
+    this.tokenMultiplier = config.tokenMultiplier;
+    // 存储 input tokens 以便在 message_start 中使用
+    (this.context as any).inputTokens = inputTokens;
   }
 
   // 发送 message_start 事件（完全按照官方格式）
   async init() {
+    const inputTokens = (this.context as any).inputTokens || 0;
     await this.writer.send({
       event: "message_start",
       data: {
@@ -51,7 +56,7 @@ export class ClaudeStream {
           model: "claude-proxy",
           stop_sequence: null,
           usage: {
-            input_tokens: 0,
+            input_tokens: inputTokens,
             output_tokens: 0,
           },
           content: [],
@@ -92,8 +97,9 @@ export class ClaudeStream {
   private async flushText(text: string) {
     if (!text) return;
     await this.ensureTextBlock();
-    // 简单估算：每个字符约等于 0.25 个 token
-    this.context.totalOutputTokens += Math.ceil(text.length * 0.25);
+    // 使用 tiktoken 估算 token，然后应用倍数
+    const estimatedTokens = Math.ceil(text.length * 0.25); // 简单估算
+    this.context.totalOutputTokens += estimatedTokens;
     await this.writer.send({
       event: "content_block_delta",
       data: {
@@ -151,6 +157,10 @@ export class ClaudeStream {
     this.context.finished = true;
     await this.context.aggregator.flushAsync();
     await this.endTextBlock();
+    
+    // 应用 token 倍数到输出 token
+    const adjustedOutputTokens = Math.ceil(this.context.totalOutputTokens * this.tokenMultiplier) || 1;
+    
     await this.writer.send({
       event: "message_delta",
       data: {
@@ -160,7 +170,7 @@ export class ClaudeStream {
           stop_sequence: null,
         },
         usage: {
-          output_tokens: this.context.totalOutputTokens || 1,
+          output_tokens: adjustedOutputTokens,
         },
       },
     }, true);
