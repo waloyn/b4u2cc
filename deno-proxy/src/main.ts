@@ -77,7 +77,9 @@ async function handleMessages(req: Request, requestId: string) {
     // 计算 input tokens
     const tokenCount = await countTokens(body, config, requestId);
     await logRequest(requestId, "info", "Token count calculated", {
-      input_tokens: tokenCount.input_tokens,
+      input_tokens: tokenCount.input_tokens, // 使用最新官方 API 字段名
+      token_count: tokenCount.token_count, // 保持向后兼容
+      tokens: tokenCount.tokens, // 保持向后兼容
       output_tokens: tokenCount.output_tokens,
     });
 
@@ -110,7 +112,7 @@ async function handleMessages(req: Request, requestId: string) {
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const writer = new SSEWriter(controller, requestId);
-        const claudeStream = new ClaudeStream(writer, config, requestId, tokenCount.input_tokens);
+        const claudeStream = new ClaudeStream(writer, config, requestId, tokenCount.input_tokens || tokenCount.token_count || tokenCount.tokens);
         // 发送 message_start 事件（完全按照官方格式）
         await claudeStream.init();
         const parser = new ToolifyParser(injected.triggerSignal);
@@ -226,12 +228,16 @@ async function handleTokenCount(req: Request, requestId: string) {
     // 计算 token 数量
     const tokenCount = await countTokens(body, config, requestId);
     await logRequest(requestId, "info", "Token count calculated", {
-      input_tokens: tokenCount.input_tokens,
+      input_tokens: tokenCount.input_tokens, // 使用最新官方 API 字段名
+      token_count: tokenCount.token_count, // 保持向后兼容
+      tokens: tokenCount.tokens, // 保持向后兼容
       output_tokens: tokenCount.output_tokens,
     });
 
     return jsonResponse({
-      input_tokens: tokenCount.input_tokens,
+      input_tokens: tokenCount.input_tokens, // 使用最新官方 API 字段名
+      token_count: tokenCount.token_count, // 保持向后兼容
+      tokens: tokenCount.tokens, // 保持向后兼容
       output_tokens: tokenCount.output_tokens,
     });
   } catch (error) {

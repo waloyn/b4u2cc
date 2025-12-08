@@ -4,16 +4,18 @@ import { logRequest } from "./logging.ts";
 import { countTokensWithTiktoken } from "./tiktoken.ts";
 
 export interface TokenCountResult {
-  input_tokens: number;
+  input_tokens: number; // 最新官方 API 字段名
+  token_count?: number; // 保持向后兼容
+  tokens?: number; // 保持向后兼容
   output_tokens?: number;
 }
 
 /**
  * 使用 tiktoken 进行精确的 token 估算
  */
-export function estimateTokensFromText(text: string): number {
+export function estimateTokensFromText(text: string, model: string = "cl100k_base"): number {
   try {
-    return countTokensWithTiktoken(text);
+    return countTokensWithTiktoken(text, model);
   } catch (error) {
     // 如果 tiktoken 失败，回退到简单的字符估算
     return Math.ceil(text.length / 4);
@@ -54,14 +56,27 @@ export async function estimateTokensLocally(
   requestId: string,
 ): Promise<TokenCountResult> {
   const allText = extractTextFromMessages(request.messages);
-  let estimatedTokens = estimateTokensFromText(allText);
+  let estimatedTokens = estimateTokensFromText(allText, request.model);
 
   // 添加系统提示的 token
   if (request.system) {
-    const systemText = typeof request.system === "string" 
-      ? request.system 
+    const systemText = typeof request.system === "string"
+      ? request.system
       : request.system.map(block => block.type === "text" ? block.text : "").join("");
-    estimatedTokens += estimateTokensFromText(systemText);
+    estimatedTokens += estimateTokensFromText(systemText, request.model);
+  }
+
+  // 添加工具定义的 token
+  if (request.tools && request.tools.length > 0) {
+    const toolsText = JSON.stringify(request.tools);
+    const toolsTokens = estimateTokensFromText(toolsText, request.model);
+    estimatedTokens += toolsTokens;
+    
+    await logRequest(requestId, "debug", "Added tool tokens", {
+      toolsCount: request.tools.length,
+      toolsTextLength: toolsText.length,
+      toolsTokens,
+    });
   }
 
   // 应用 token 倍数
@@ -72,10 +87,14 @@ export async function estimateTokensLocally(
     estimatedTokens,
     multiplier: config.tokenMultiplier,
     adjustedTokens,
+    model: request.model,
+    hasTools: !!(request.tools && request.tools.length > 0),
   });
 
   return {
-    input_tokens: adjustedTokens,
+    input_tokens: adjustedTokens, // 使用最新官方 API 字段名
+    token_count: adjustedTokens, // 保持向后兼容
+    tokens: adjustedTokens, // 保持向后兼容
   };
 }
 
