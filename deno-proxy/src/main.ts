@@ -46,14 +46,20 @@ function unauthorized() {
   return jsonResponse({ error: "unauthorized" }, 401);
 }
 
-function validateClientKey(req: Request, config: ProxyConfig): boolean {
-  if (!config.clientApiKey) return true;
+function extractClientApiKey(req: Request): string | undefined {
   const header = req.headers.get("x-api-key") || req.headers.get("authorization");
-  if (!header) return false;
+  if (!header) return undefined;
   if (header.startsWith("Bearer ")) {
-    return header.slice(7) === config.clientApiKey;
+    return header.slice(7);
   }
-  return header === config.clientApiKey;
+  return header;
+}
+
+function validateClientKey(req: Request, config: ProxyConfig): boolean {
+  if (!config.apiKey) return true;
+  const clientKey = extractClientApiKey(req);
+  if (!clientKey) return false;
+  return clientKey === config.apiKey;
 }
 
 async function handleMessages(req: Request, requestId: string) {
@@ -91,7 +97,8 @@ async function handleMessages(req: Request, requestId: string) {
     const upstreamReq = { ...openaiBase, messages: injected.messages };
 
     await rateLimiter.acquire();
-    const upstreamRes = await callUpstream(upstreamReq, config, requestId);
+    const clientApiKey = extractClientApiKey(req);
+    const upstreamRes = await callUpstream(upstreamReq, config, requestId, clientApiKey);
     await logRequest(requestId, "info", "Upstream responded", {
       status: upstreamRes.status,
       url: config.upstreamBaseUrl,
@@ -250,7 +257,7 @@ async function handleTokenCount(req: Request, requestId: string) {
 }
 
 // 导出 handler 函数供 deploy.ts 使用
-export const handler = (req: Request) => {
+export const handler = async (req: Request) => {
   const url = new URL(req.url);
 
   if (req.method === "GET" && url.pathname === "/") {
@@ -272,6 +279,35 @@ export const handler = (req: Request) => {
 
   if (req.method === "GET" && url.pathname === "/healthz") {
     return jsonResponse({ status: "ok" });
+  }
+
+  if (req.method === "GET" && url.pathname === "/v1/models") {
+    if (!validateClientKey(req, config)) {
+      return unauthorized();
+    }
+    try {
+      // 从 upstreamBaseUrl 提取基础 URL（去除路径部分）
+      const upstreamUrlObj = new URL(config.upstreamBaseUrl);
+      const upstreamUrl = `${upstreamUrlObj.origin}/v1/models`;
+      const clientApiKey = extractClientApiKey(req);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (clientApiKey) {
+        headers["Authorization"] = `Bearer ${clientApiKey}`;
+      }
+      const upstreamRes = await fetch(upstreamUrl, {
+        method: "GET",
+        headers,
+      });
+      const body = await upstreamRes.text();
+      return new Response(body, {
+        status: upstreamRes.status,
+        headers: { "content-type": "application/json" },
+      });
+    } catch (error) {
+      return jsonResponse({ error: "upstream_error", details: String(error) }, 502);
+    }
   }
 
   if (req.method === "OPTIONS") {

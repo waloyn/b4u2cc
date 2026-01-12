@@ -2,9 +2,8 @@ export interface ProxyConfig {
   port: number;
   host: string;
   upstreamBaseUrl: string;
-  upstreamApiKey?: string;
+  apiKey?: string;
   upstreamModelOverride?: string;
-  clientApiKey?: string;
   requestTimeoutMs: number;
   aggregationIntervalMs: number;
   maxRequestsPerMinute: number;
@@ -58,14 +57,13 @@ export function loadConfig(): ProxyConfig {
 
   // 检查是否启用自动端口配置
   const autoPort = Deno.env.get("AUTO_PORT") === "true";
-  
+
   // 如果启用自动端口，则使用 0 让系统自动分配端口
   // 否则使用环境变量指定的端口或默认端口 3456
   const port = autoPort ? 0 : Number(Deno.env.get("PORT") ?? "3456");
   const host = Deno.env.get("HOST") ?? "0.0.0.0";
-  const upstreamApiKey = Deno.env.get("UPSTREAM_API_KEY");
+  const apiKey = Deno.env.get("API_KEY");
   const upstreamModelOverride = Deno.env.get("UPSTREAM_MODEL");
-  const clientApiKey = Deno.env.get("CLIENT_API_KEY");
   const requestTimeoutMs = Number(Deno.env.get("TIMEOUT_MS") ?? "120000");
   const aggregationIntervalMs = Number(Deno.env.get("AGGREGATION_INTERVAL_MS") ?? "35");
   const maxRequestsPerMinute = Number(Deno.env.get("MAX_REQUESTS_PER_MINUTE") ?? "10");
@@ -76,9 +74,8 @@ export function loadConfig(): ProxyConfig {
     port,
     host,
     upstreamBaseUrl,
-    upstreamApiKey,
+    apiKey,
     upstreamModelOverride,
-    clientApiKey,
     requestTimeoutMs,
     aggregationIntervalMs,
     maxRequestsPerMinute,

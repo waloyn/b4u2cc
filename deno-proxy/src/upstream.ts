@@ -6,6 +6,7 @@ export async function callUpstream(
   body: OpenAIChatRequest,
   config: ProxyConfig,
   requestId: string,
+  clientApiKey?: string,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
@@ -13,8 +14,8 @@ export async function callUpstream(
   const headers = new Headers({
     "content-type": "application/json",
   });
-  if (config.upstreamApiKey) {
-    headers.set("authorization", `Bearer ${config.upstreamApiKey}`);
+  if (clientApiKey) {
+    headers.set("authorization", `Bearer ${clientApiKey}`);
   }
 
   await logRequest(requestId, "debug", "Sending upstream request", {
